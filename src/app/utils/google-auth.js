@@ -7,8 +7,10 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 const SCOPES = [
-    'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+    'https://www.googleapis.com/auth/drive.readonly',
 ];
 
 export const getAuthUrl = () => oauth2Client.generateAuthUrl({

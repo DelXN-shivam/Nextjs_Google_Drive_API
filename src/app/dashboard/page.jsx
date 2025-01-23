@@ -2,6 +2,7 @@ import React from 'react';
 import oauth2Client from '../utils/google-auth';
 import { cookies } from 'next/headers';
 import { google } from 'googleapis';
+import SearchPage from '../searchpage/page';
 
 const page = async () => {
     const cookieStore = await cookies();
@@ -38,6 +39,7 @@ const page = async () => {
 
     return (
         <div className="min-h-screen bg-gray-50 p-8 sm:p-20">
+            <SearchPage />
             <h1 className="text-2xl font-extrabold text-gray-800 mb-6 text-center">
                 Google Drive Files and Folders
             </h1>
