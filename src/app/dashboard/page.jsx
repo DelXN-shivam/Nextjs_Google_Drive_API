@@ -2,26 +2,25 @@ import React from 'react';
 import oauth2Client from '../utils/google-auth';
 import { cookies } from 'next/headers';
 import { google } from 'googleapis';
-import Uploadpage from '../uploadpage/page';
 
 const page = async () => {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("google_access_token")?.value;
     oauth2Client.setCredentials({ access_token: accessToken });
 
-    let files;
-
     const drive = google.drive('v3');
+    let allFilesAndFolders = [];
 
     try {
         const result = await drive.files.list({
             auth: oauth2Client,
-            'fields': 'nextPageToken, files(id, name, mimeType, webViewLink)',
-            'pageSize': 20,
+            q: "'root' in parents", // Fetch only files and folders in the root directory
+            fields: 'files(id, name, mimeType, webViewLink)',
+            pageSize: 20,
         });
-        files = result.data.files;
+        allFilesAndFolders = result.data.files;
     } catch (error) {
-        console.log(error);
+        console.error('Error fetching files:', error);
         return (
             <div className="flex justify-center w-full pt-10 font-bold text-red-600">
                 Something went wrong! Please login again.
@@ -29,40 +28,49 @@ const page = async () => {
         );
     }
 
-    // Group files by extensions
-    const groupedFiles = files?.reduce((acc, file) => {
-        const extension = file.name.split('.').pop().toLowerCase();
-        if (!acc[extension]) acc[extension] = [];
-        acc[extension].push(file);
+    // Group files and folders by their type (extension for files)
+    const groupedFiles = allFilesAndFolders.reduce((acc, file) => {
+        const key = file.mimeType === 'application/vnd.google-apps.folder' ? 'folders' : file.name.split('.').pop().toLowerCase();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(file);
         return acc;
     }, {});
 
     return (
         <div className="min-h-screen bg-gray-50 p-8 sm:p-20">
             <h1 className="text-2xl font-extrabold text-gray-800 mb-6 text-center">
-                Google Drive Files (Grouped by Extensions)
+                Google Drive Files and Folders
             </h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {groupedFiles && Object.keys(groupedFiles).length > 0 ? (
-                    Object.keys(groupedFiles).map((extension) => (
+                    Object.keys(groupedFiles).map((key) => (
                         <div
-                            key={extension}
+                            key={key}
                             className="bg-white shadow-md rounded-lg p-6 border-t-4 border-blue-500"
                         >
                             <h2 className="text-lg font-semibold text-blue-600 mb-4">
-                                {extension.toUpperCase()} Files
+                                {key === 'folders' ? 'Folders' : `${key.toUpperCase()} Files`}
                             </h2>
                             <ul className="space-y-2">
-                                {groupedFiles[extension].map((file) => (
+                                {groupedFiles[key].map((file) => (
                                     <li key={file.id}>
-                                        <a
-                                            href={file.webViewLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-gray-700 hover:text-blue-600 hover:underline transition"
-                                        >
-                                            {file.name}
-                                        </a>
+                                        {file.mimeType === 'application/vnd.google-apps.folder' ? (
+                                            <a
+                                                href={`/drive/${file.id}`}
+                                                className="text-gray-700 hover:text-blue-600 hover:underline transition"
+                                            >
+                                                📁 {file.name}
+                                            </a>
+                                        ) : (
+                                            <a
+                                                href={file.webViewLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-gray-700 hover:text-blue-600 hover:underline transition"
+                                            >
+                                                📄 {file.name}
+                                            </a>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -70,18 +78,187 @@ const page = async () => {
                     ))
                 ) : (
                     <p className="text-center text-gray-600">
-                        No files found in Google Drive.
+                        No files or folders found in Google Drive.
                     </p>
                 )}
-            </div>
-            <div className="mt-10 flex justify-center">
-                <Uploadpage />
             </div>
         </div>
     );
 };
 
 export default page;
+
+
+
+
+
+
+// import React from 'react';
+// import oauth2Client from '../utils/google-auth';
+// import { cookies } from 'next/headers';
+// import { google } from 'googleapis';
+
+// const page = async () => {
+//     const cookieStore = await cookies();
+//     const accessToken = cookieStore.get("google_access_token")?.value;
+//     oauth2Client.setCredentials({ access_token: accessToken });
+
+//     let files;
+
+//     const drive = google.drive('v3');
+
+//     try {
+//         const result = await drive.files.list({
+//             auth: oauth2Client,
+//             q: "'root' in parents", // Fetch only items in the root folder
+//             fields: 'files(id, name, mimeType, webViewLink)',
+//             pageSize: 20,
+//         });
+//         files = result.data.files;
+//     } catch (error) {
+//         console.log(error);
+//         return (
+//             <div className="flex justify-center w-full pt-10 font-bold text-red-600">
+//                 Something went wrong! Please login again.
+//             </div>
+//         );
+//     }
+
+//     return (
+//         <div className="min-h-screen bg-gray-50 p-8 sm:p-20">
+//             <h1 className="text-2xl font-extrabold text-gray-800 mb-6 text-center">
+//                 Google Drive Files and Folders
+//             </h1>
+//             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+//                 {files && files.length > 0 ? (
+//                     files.map((file) => (
+//                         <div
+//                             key={file.id}
+//                             className="bg-white shadow-md rounded-lg p-6 border-t-4 border-blue-500"
+//                         >
+//                             {file.mimeType === 'application/vnd.google-apps.folder' ? (
+//                                 <a
+//                                     href={`/drive/${file.id}`} // Navigate to the folder page
+//                                     className="text-gray-700 hover:text-blue-600 hover:underline transition"
+//                                 >
+//                                     📁 {file.name}
+//                                 </a>
+//                             ) : (
+//                                 <a
+//                                     href={file.webViewLink}
+//                                     target="_blank"
+//                                     rel="noopener noreferrer"
+//                                     className="text-gray-700 hover:text-blue-600 hover:underline transition"
+//                                 >
+//                                     📄 {file.name}
+//                                 </a>
+//                             )}
+//                         </div>
+//                     ))
+//                 ) : (
+//                     <p className="text-center text-gray-600">
+//                         No files or folders found in Google Drive.
+//                     </p>
+//                 )}
+//             </div>
+//         </div>
+//     );
+// };
+
+// export default page;
+
+
+
+
+// import React from 'react';
+// import oauth2Client from '../utils/google-auth';
+// import { cookies } from 'next/headers';
+// import { google } from 'googleapis';
+// import Uploadpage from '../uploadpage/page';
+// import DrivePage from '../drivepage/page';
+// import FolderPage from '../drive/[folderId]/page';
+
+// const page = async () => {
+//     const cookieStore = await cookies();
+//     const accessToken = cookieStore.get("google_access_token")?.value;
+//     oauth2Client.setCredentials({ access_token: accessToken });
+
+//     let files;
+
+//     const drive = google.drive('v3');
+
+//     try {
+//         const result = await drive.files.list({
+//             auth: oauth2Client,
+//             'fields': 'nextPageToken, files(id, name, mimeType, webViewLink)',
+//             'pageSize': 20,
+//         });
+//         files = result.data.files;
+//     } catch (error) {
+//         console.log(error);
+//         return (
+//             <div className="flex justify-center w-full pt-10 font-bold text-red-600">
+//                 Something went wrong! Please login again.
+//             </div>
+//         );
+//     }
+
+//     // Group files by extensions
+//     const groupedFiles = files?.reduce((acc, file) => {
+//         const extension = file.name.split('.').pop().toLowerCase();
+//         if (!acc[extension]) acc[extension] = [];
+//         acc[extension].push(file);
+//         return acc;
+//     }, {});
+
+//     return (
+        
+//         <div className="min-h-screen bg-gray-50 p-8 sm:p-20">
+//             {/* <div className="mb-10 flex justify-center">
+//                 <Uploadpage />
+//             </div> */}
+//             <h1 className="text-2xl font-extrabold text-gray-800 mb-6 text-center">
+//                 Google Drive Files (Grouped by Extensions)
+//             </h1>
+//             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+//                 {groupedFiles && Object.keys(groupedFiles).length > 0 ? (
+//                     Object.keys(groupedFiles).map((extension) => (
+//                         <div
+//                             key={extension}
+//                             className="bg-white shadow-md rounded-lg p-6 border-t-4 border-blue-500"
+//                         >
+//                             <h2 className="text-lg font-semibold text-blue-600 mb-4">
+//                                 {extension.toUpperCase()} Files
+//                             </h2>
+//                             <ul className="space-y-2">
+//                                 {groupedFiles[extension].map((file) => (
+//                                     <li key={file.id}>
+//                                         <a
+//                                             href={file.webViewLink}
+//                                             target="_blank"
+//                                             rel="noopener noreferrer"
+//                                             className="text-gray-700 hover:text-blue-600 hover:underline transition"
+//                                         >
+//                                             {file.name}
+//                                         </a>
+//                                     </li>
+//                                 ))}
+//                             </ul>
+//                         </div>
+//                     ))
+//                 ) : (
+//                     <p className="text-center text-gray-600">
+//                         No files found in Google Drive.
+//                     </p>
+//                 )}
+//             </div>
+//             {/* <FolderPage /> */}
+            
+//         </div>
+//     );
+// };
+
+// export default page;
 
 
 
